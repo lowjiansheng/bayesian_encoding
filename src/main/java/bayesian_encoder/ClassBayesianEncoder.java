@@ -2,6 +2,7 @@ package bayesian_encoder;
 
 import data_structures.*;
 import helper.Helper;
+import helper.WeightsFileHelper;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -12,7 +13,7 @@ import java.util.Map;
 
 public class ClassBayesianEncoder extends BayesianEncoder{
 
-    private String CNF_ENDER = " 0\n";
+    private String CNF_ENDER = "0\n";
 
     @Override
     public void encodeBayesianQueryIntoCNF(int numVariables,
@@ -46,11 +47,11 @@ public class ClassBayesianEncoder extends BayesianEncoder{
         // Parameter variables
         for (BayesianClique clique : cliques) {
             totalNumVariables += Math.pow(2,clique.getVariables().size());
-            totalNumClauses += 2 * clique.getVariables().size() * Math.pow(2, clique.getVariables().size());
+            totalNumClauses += Math.pow(2, clique.getVariables().size()) * (clique.getVariables().size() + 1);
         }
         // Evidence
         totalNumClauses += evidence.size();
-        encoderWriter.write("c SAT CNF BAYESIAN ENCODING \n");
+        encoderWriter.write("c SAT CNF Class Encoding Scheme \n");
         encoderWriter.write("p cnf " + totalNumVariables + " " +  totalNumClauses + "\n");
         weightsWriter.write("p " + totalNumVariables + "\n");
     }
@@ -65,17 +66,17 @@ public class ClassBayesianEncoder extends BayesianEncoder{
         }
         for (int i = 0 ; i < numVariables; i++) {
             // Ia1 -> Ia2
-            String rightImplication = "-" + (2*i) + " " + (2*i+1) + CNF_ENDER;
+            String rightImplication = "-" + (2*i) + " " + (2*i+1) + " " +CNF_ENDER;
             encoderWriter.write(rightImplication);
             // Ia2 -> Ia1
-            String leftImplication = "-" + (2*i+1) + " " + (2*i) + CNF_ENDER;
+            String leftImplication = "-" + (2*i+1) + " " + (2*i) + " " + CNF_ENDER;
             encoderWriter.write(leftImplication);
 
             // All indicator variables will have weights of 1
-            weightsWriter.write("w " + (2*i) + " 1 0\n");
-            weightsWriter.write("w -" + (2*i) + " 1 0\n");
-            weightsWriter.write("w " + (2*i+1) + " 1 0\n");
-            weightsWriter.write("w -" + (2*i+1) + " 1 0\n");
+            WeightsFileHelper.writeWeightsLine(weightsWriter, 2*i, 1, false);
+            WeightsFileHelper.writeWeightsLine(weightsWriter, 2*i, 1, true);
+            WeightsFileHelper.writeWeightsLine(weightsWriter, 2*i+1, 1, false);
+            WeightsFileHelper.writeWeightsLine(weightsWriter, 2*i+1, 1, true);
         }
     }
 
@@ -87,19 +88,20 @@ public class ClassBayesianEncoder extends BayesianEncoder{
             List<Integer> variables = clique.getVariables();
             double totalNumCombinations = Math.pow(2, variables.size());
 
+            // Creating Parameter Variables
             for (int i = 0 ; i < totalNumCombinations; i++) {
                 // Get the bits of i to retrieve the value of indicator variable
                 // If bit is true, we will use 2n*variable_value
-                // If bit is false, we will use 2n*variable_value +
+                // If bit is false, we will use 2n*variable_value + 1
                 if (variables.size() == 0) {
                     System.out.println("Parser/file error. Not possible for a clique to contain 0 variables.");
                     System.exit(1);
                 }
                 // Bit Array is Big Endian : integerBits[0] is the Bayesian Node being implied.
                 boolean[] integerBits = Helper.getBitsOfInteger(variables.size(), i);
+
+                StringBuilder leftImplication = new StringBuilder();
                 for (int j = 0 ; j < integerBits.length; j++) {
-                    // Right implication
-                    // Px1x2x3.. -> Ix1
                     int indicatorVariable;
                     int variableId = variables.get(integerBits.length - 1 - j);
                     // Mapping Integer bits to its respective Indicator Variable.
@@ -108,20 +110,22 @@ public class ClassBayesianEncoder extends BayesianEncoder{
                     else {
                         indicatorVariable = 2 * variableId + 1;
                     }
-                    String rightImplication = "-" + parameterVariableID + " " + indicatorVariable + CNF_ENDER;
+
+                    String rightImplication = "-" + parameterVariableID + " " + indicatorVariable + " " + CNF_ENDER;
                     encoderWriter.write(rightImplication);
-                    String leftImplication = "-" + indicatorVariable + " " + parameterVariableID + CNF_ENDER;
-                    encoderWriter.write(leftImplication);
+                    leftImplication.append("-").append(indicatorVariable).append(" ");
                 }
-                float val = findWeightValue(integerBits, clique.getFunctionTable());
-                String literal = "w " + parameterVariableID + " " + val + " 0\n";
-                weightsWriter.write(literal);
-                String negatedLiteral = "w -" + parameterVariableID + " 1 0\n";
-                weightsWriter.write(negatedLiteral);
+                leftImplication.append(parameterVariableID).append(" ").append(CNF_ENDER);
+                encoderWriter.write(leftImplication.toString());
+
+                float positiveWeightValue = findWeightValue(integerBits, clique.getFunctionTable());
+                WeightsFileHelper.writeWeightsLine(weightsWriter, parameterVariableID, positiveWeightValue, false);
+                WeightsFileHelper.writeWeightsLine(weightsWriter, parameterVariableID, 1, true);
                 parameterVariableID++;
             }
         }
     }
+
 
     /**
      * findWeightValue maps a particular Parameter variable to its weight value
@@ -138,9 +142,9 @@ public class ClassBayesianEncoder extends BayesianEncoder{
             secondIndex = 0;
         }
         int firstIndex = Helper.bitsToInteger(Arrays.copyOfRange(integerBits, 1, integerBits.length));
-        System.out.println("First index = " + firstIndex);
         return functionTable[firstIndex][secondIndex];
     }
+
 
     private void createHints(BufferedWriter writer, Map<Integer, Boolean> evidence) throws IOException {
         for (Map.Entry<Integer, Boolean> entry : evidence.entrySet()) {

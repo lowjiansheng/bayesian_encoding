@@ -118,7 +118,7 @@ public class AltBayesianEncoder extends BayesianEncoder{
         // Add clauses created by evidence
         totalNumClauses += evidence.size();
 
-        encoderWriter.write("c SAT CNF BAYESIAN ENCODING \n");
+        encoderWriter.write("c SAT CNF Alt Encoding Scheme\n");
         encoderWriter.write("p cnf " + totalNumVariables + " " +  totalNumClauses + "\n");
         weightsWriter.write("p " + totalNumVariables + "\n");
     }

@@ -12,17 +12,8 @@ import java.util.Map;
 
 public class ClassBayesianEncoder extends BayesianEncoder{
 
-    String CNF_ENDER = " 0\n";
+    private String CNF_ENDER = " 0\n";
 
-    // Variables coding scheme:
-    // Example:
-    // 3 variables
-    // a, b, c
-    // Ia1 = 1, Ia2 = 2
-    // ... Ian = 2n-1, 2n
-    // Ordering of parameters will depend on the way it is specified in the Cliques.
-    // Pa1 = 2n+1, Pa2 = 2n+2, Pb1 = 2n+3, Pb2 = 2n+4
-    // Pa1b1c1 = 2n+5, Pa1b1c2 = 2n+6 ... ,Pa2b2c2 = 2n+12
     @Override
     public void encodeBayesianQueryIntoCNF(int numVariables,
                                            List<BayesianClique> cliques, Map<Integer,Boolean> evidence) {
@@ -82,13 +73,15 @@ public class ClassBayesianEncoder extends BayesianEncoder{
 
             // All indicator variables will have weights of 1
             weightsWriter.write("w " + (2*i) + " 1 0\n");
+            weightsWriter.write("w -" + (2*i) + " 1 0\n");
+            weightsWriter.write("w " + (2*i+1) + " 1 0\n");
             weightsWriter.write("w -" + (2*i+1) + " 1 0\n");
         }
     }
 
     private void createTypeTwoConstraints(BufferedWriter encoderWriter, BufferedWriter weightsWriter,
                                           int numVariables, List<BayesianClique> cliques) throws IOException {
-        int parameterVariableID = 2 * numVariables + 1;
+        int parameterVariableID = 2 * numVariables;
         for (BayesianClique clique : cliques) {
             // The last variable is the Bayesian Node being implied.
             List<Integer> variables = clique.getVariables();
@@ -99,7 +92,7 @@ public class ClassBayesianEncoder extends BayesianEncoder{
                 // If bit is true, we will use 2n*variable_value
                 // If bit is false, we will use 2n*variable_value +
                 if (variables.size() == 0) {
-                    System.out.println("WEIRD");
+                    System.out.println("Parser/file error. Not possible for a clique to contain 0 variables.");
                     System.exit(1);
                 }
                 // Bit Array is Big Endian : integerBits[0] is the Bayesian Node being implied.
@@ -120,10 +113,19 @@ public class ClassBayesianEncoder extends BayesianEncoder{
                     String leftImplication = "-" + indicatorVariable + " " + parameterVariableID + CNF_ENDER;
                     encoderWriter.write(leftImplication);
                 }
+                // DEBUG
+                System.out.println("Parameter var = " + parameterVariableID);
+                System.out.println("i = " + i);
+                System.out.println("Boolean array: " );
+                for (int k = 0 ; k < integerBits.length; k++ ){
+                    System.out.print(integerBits[k]);
+                }
+                System.out.println();
+                // DEBUG
                 float val = findWeightValue(integerBits, clique.getFunctionTable());
-                String literal = parameterVariableID + val + " 0\n";
+                String literal = "w " + parameterVariableID + " " + val + " 0\n";
                 weightsWriter.write(literal);
-                String negatedLiteral = "-" + parameterVariableID + " 1 0\n";
+                String negatedLiteral = "w -" + parameterVariableID + " 1 0\n";
                 weightsWriter.write(negatedLiteral);
                 parameterVariableID++;
             }
@@ -144,7 +146,8 @@ public class ClassBayesianEncoder extends BayesianEncoder{
         } else {
             secondIndex = 0;
         }
-        int firstIndex = Helper.bitsToInteger(Arrays.copyOfRange(integerBits, 0, integerBits.length - 1));
+        int firstIndex = Helper.bitsToInteger(Arrays.copyOfRange(integerBits, 1, integerBits.length));
+        System.out.println("First index = " + firstIndex);
         return functionTable[firstIndex][secondIndex];
     }
 

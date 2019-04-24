@@ -10,9 +10,11 @@ public class UAIParser {
     List<BayesianClique> cliques;
     Map<Integer, Boolean> queryValues;
     int numVariables;
+    public enum FILE_TYPE {
+        MODEL, EVIDENCE
+    }
 
-    public void parse(String filePath) {
-        System.out.println("Parsing model file now.");
+    public void parse(String filePath, FILE_TYPE fileType) {
         File file = new File(filePath);
         FileInputStream fis = null;
         try {
@@ -23,126 +25,118 @@ public class UAIParser {
         }
         InputStreamReader isr = new InputStreamReader(fis);
         BufferedReader br = new BufferedReader(isr);
-
-        String line;
         try {
-            // First line: Should be BAYES
-            line = br.readLine();
-            if (!line.equals("BAYES")) {
-                System.out.println("Wrong file format.");
-                System.exit(1);
-            }
-            // Second line: Num variables
-            line = br.readLine();
-            int numVariables = Integer.parseInt(line);
-            this.numVariables = numVariables;
-            // Third line: Cardinality of each variable
-            // Since we are only doing Bayesian, the cardinality of each variable
-            // should be 2.
-            line = br.readLine();
-            String[] cardinalities = line.split(" ");
-            for (String cardinality: cardinalities) {
-                if (Integer.parseInt(cardinality) != 2) {
-                    System.out.println("Wrong file format for cardinality.");
+            switch (fileType) {
+                case MODEL:
+                    parseModel(br);
+                    break;
+                case EVIDENCE:
+                    parseEvidence(br);
+                    break;
+                default:
+                    System.out.println("Not a valid file type to parse.");
                     System.exit(1);
-                }
             }
-
-            // Fourth line: Number of cliques in the problem
-            line = br.readLine();
-            int numCliques = Integer.parseInt(line);
-            // We will add in the cliques in order. When parsing the function tables later on we will make use
-            // of this assumption.
-            List<BayesianClique> cliques = new ArrayList<>();
-            for (int i = 0; i < numCliques; i++) {
-                line = br.readLine();
-                String[] scopeOfClique = line.split(" ");
-                int numVariablesInClique = Integer.parseInt(scopeOfClique[0]);
-                List<Integer> variablesInClique = new ArrayList<>();
-                // TODO: Is there a more idiomatic way to do this in Java?
-                for (int j = 0 ; j < numVariablesInClique; j++) {
-                    int variable = Integer.parseInt(scopeOfClique[j+1]);
-                    variablesInClique.add(variable);
-                }
-                BayesianClique cliqueToAdd = new BayesianClique(variablesInClique);
-                cliques.add(cliqueToAdd);
-            }
-
-            // Empty line
-            line = br.readLine();
-
-            // Parsing function tables
-            for (int i = 0 ; i < numCliques; i++) {
-                // Number of entries given
-                line = br.readLine();
-                int numEntries = Integer.parseInt(line);
-                float [][] variableFunctionValues = new float[numEntries/2][2];
-                for (int j = 0 ; j < numEntries/2; j++) {
-                    line = br.readLine();
-                    line = line.trim();
-                    String[] functions = line.split(" ");
-                    if (functions.length != 2) {
-                        System.out.println("Error in function table length. Each row should be of length 2.");
-                        System.exit(1);
-                    }
-                    float[] functionValues = new float[functions.length];
-                    // Converting each entry from string into float values.
-                    for (int k = 0 ; k < functions.length ; k ++ ){
-                        functionValues[k] = Float.parseFloat(functions[k]);
-                    }
-                    variableFunctionValues[j] = functionValues;
-                }
-                cliques.get(i).setFunctionTable(variableFunctionValues);
-            }
-
-            this.cliques = cliques;
-            br.close();
-            System.out.println("Model parsing done.");
-
-
         } catch (IOException e) {
             e.printStackTrace();
             System.exit(1);
         }
     }
 
-    /**
-     * Parses the evidence (query) file.
-     * @param filePath
-     */
-    public void parseEvidence(String filePath) {
-        System.out.println("Parsing evidence file now.");
-        File file = new File(filePath);
-        FileInputStream fis = null;
-        try {
-            fis = new FileInputStream(file);
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
+    private void parseModel(BufferedReader br) throws IOException {
+        System.out.println("Parsing Model file now.");
+        String line;
+        // First line: Should be BAYES
+        line = br.readLine();
+        if (!line.equals("BAYES")) {
+            System.out.println("Wrong file format.");
             System.exit(1);
         }
-        InputStreamReader isr = new InputStreamReader(fis);
-        BufferedReader br = new BufferedReader(isr);
-
-        this.queryValues = new HashMap<>();
-        String line;
-        try {
-            line = br.readLine();
-            String [] values = line.split(" ");
-            int numObservedVariables = Integer.parseInt(values[0]);
-            if (values.length != 2 * numObservedVariables + 1) {
-                System.out.println("Evidence file has wrong format. Number of variable entries in the file is = " + values.length);
+        // Second line: Num variables
+        line = br.readLine();
+        int numVariables = Integer.parseInt(line);
+        this.numVariables = numVariables;
+        // Third line: Cardinality of each variable
+        // Since we are only doing Bayesian, the cardinality of each variable
+        // should be 2.
+        line = br.readLine();
+        String[] cardinalities = line.split(" ");
+        for (String cardinality: cardinalities) {
+            if (Integer.parseInt(cardinality) != 2) {
+                System.out.println("Wrong file format for cardinality.");
                 System.exit(1);
             }
-            for (int i = 0 ; i < numObservedVariables ; i++) {
-                boolean val = (Integer.parseInt(values[i*2 +2]) == 0) ? false : true;
-                this.queryValues.put(Integer.parseInt(values[i * 2 + 1]), val);
+        }
+
+        // Fourth line: Number of cliques in the problem
+        line = br.readLine();
+        int numCliques = Integer.parseInt(line);
+        // We will add in the cliques in order. When parsing the function tables later on we will make use
+        // of this assumption.
+        List<BayesianClique> cliques = new ArrayList<>();
+        for (int i = 0; i < numCliques; i++) {
+            line = br.readLine();
+            String[] scopeOfClique = line.split(" ");
+            int numVariablesInClique = Integer.parseInt(scopeOfClique[0]);
+            List<Integer> variablesInClique = new ArrayList<>();
+            // TODO: Is there a more idiomatic way to do this in Java?
+            for (int j = 0 ; j < numVariablesInClique; j++) {
+                int variable = Integer.parseInt(scopeOfClique[j+1]);
+                variablesInClique.add(variable);
             }
-            br.close();
-            System.out.println("Parsing evidence done.");
-        } catch (IOException e) {
-            e.printStackTrace();
+            BayesianClique cliqueToAdd = new BayesianClique(variablesInClique);
+            cliques.add(cliqueToAdd);
+        }
+
+        // Empty line
+        line = br.readLine();
+
+        // Parsing function tables
+        for (int i = 0 ; i < numCliques; i++) {
+            // Number of entries given
+            line = br.readLine();
+            int numEntries = Integer.parseInt(line);
+            float [][] variableFunctionValues = new float[numEntries/2][2];
+            for (int j = 0 ; j < numEntries/2; j++) {
+                line = br.readLine();
+                line = line.trim();
+                String[] functions = line.split(" ");
+                if (functions.length != 2) {
+                    System.out.println("Error in function table length. Each row should be of length 2.");
+                    System.exit(1);
+                }
+                float[] functionValues = new float[functions.length];
+                // Converting each entry from string into float values.
+                for (int k = 0 ; k < functions.length ; k ++ ){
+                    functionValues[k] = Float.parseFloat(functions[k]);
+                }
+                variableFunctionValues[j] = functionValues;
+            }
+            cliques.get(i).setFunctionTable(variableFunctionValues);
+        }
+
+        this.cliques = cliques;
+        br.close();
+        System.out.println("Parsing Model done.");
+    }
+
+    public void parseEvidence(BufferedReader br) throws IOException{
+        System.out.println("Parsing evidence file now.");
+        this.queryValues = new HashMap<>();
+        String line;
+        line = br.readLine();
+        String [] values = line.split(" ");
+        int numObservedVariables = Integer.parseInt(values[0]);
+        if (values.length != 2 * numObservedVariables + 1) {
+            System.out.println("Evidence file has wrong format. Number of variable entries in the file is = " + values.length);
             System.exit(1);
         }
+        for (int i = 0 ; i < numObservedVariables ; i++) {
+            boolean val = (Integer.parseInt(values[i*2 +2]) == 0) ? false : true;
+            this.queryValues.put(Integer.parseInt(values[i * 2 + 1]), val);
+        }
+        br.close();
+        System.out.println("Parsing evidence done.");
     }
 
     public List<BayesianClique> getCliques() {

@@ -14,18 +14,18 @@ public class Main {
     }
 
     public static void main(String[] args) {
-        String fileName = args[0];
+        String modelFileName = args[0];
         String evidenceFileName = args[1];
         ENCODER encoderUsed = ENCODER.valueOf(args[2]);
 
         UAIParser parser = new UAIParser();
-        parser.parse(fileName);
-
+        parser.parse(modelFileName, UAIParser.FILE_TYPE.MODEL);
         List<BayesianClique> cliques = parser.getCliques();
-        parser.parseEvidence(evidenceFileName);
+
+        parser.parse(evidenceFileName, UAIParser.FILE_TYPE.EVIDENCE);
         Map<Integer, Boolean> queryVariables = parser.getQueryValues();
         // Instantiate either the ClassBayesianEncoder or the AltBayesianEncoder
-        BayesianEncoder encoder;
+        BayesianEncoder encoder = null;
         switch (encoderUsed) {
             case CLASS_ENCODER:
                 System.out.println("Using the encoding scheme taught in class...");
@@ -40,11 +40,9 @@ public class Main {
                 System.exit(1);
         }
 
-        BayesianEncoder networkEncoder = new ClassBayesianEncoder();
-
-        networkEncoder.encodeBayesianQueryIntoCNF(parser.getNumVariables(),
+        encoder.encodeBayesianQueryIntoCNF(parser.getNumVariables(),
                 cliques, parser.getQueryValues());
+
         System.out.println("Finished encoding network in CNF.");
     }
-
 }

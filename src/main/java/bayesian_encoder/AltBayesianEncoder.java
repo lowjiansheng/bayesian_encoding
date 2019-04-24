@@ -14,8 +14,8 @@ public class AltBayesianEncoder extends BayesianEncoder{
     @Override
     public void encodeBayesianQueryIntoCNF(int numVariables,
                                            List<BayesianClique> cliques, Map<Integer,Boolean> evidence){
-        String fileNameCNFEncoding = "test_encoder.cnf";
-        String fileNameWeights = "test_weights.txt";
+        String fileNameCNFEncoding = "output_encoding.cnf";
+        String fileNameWeights = "output_weights.txt";
         // Create CNF file
         try {
             BufferedWriter encodingWriter = new BufferedWriter(new FileWriter(fileNameCNFEncoding));

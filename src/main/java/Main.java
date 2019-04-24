@@ -23,10 +23,20 @@ public class Main {
         List<BayesianClique> cliques = parser.getCliques();
 
         parser.parse(evidenceFileName, UAIParser.FILE_TYPE.EVIDENCE);
-        Map<Integer, Boolean> queryVariables = parser.getQueryValues();
+
         // Instantiate either the ClassBayesianEncoder or the AltBayesianEncoder
+        BayesianEncoder encoder = chooseEncoder(encoderUsed);
+
+        encoder.encodeBayesianQueryIntoCNF(parser.getNumVariables(),
+                cliques, parser.getQueryValues());
+
+        System.out.println("Finished encoding network in CNF.");
+    }
+
+
+    private static BayesianEncoder chooseEncoder(ENCODER encoderSelected) {
         BayesianEncoder encoder = null;
-        switch (encoderUsed) {
+        switch (encoderSelected) {
             case CLASS_ENCODER:
                 System.out.println("Using the encoding scheme taught in class...");
                 encoder = new ClassBayesianEncoder();
@@ -39,10 +49,7 @@ public class Main {
                 System.out.println("Please input a legal encoder type.");
                 System.exit(1);
         }
-
-        encoder.encodeBayesianQueryIntoCNF(parser.getNumVariables(),
-                cliques, parser.getQueryValues());
-
-        System.out.println("Finished encoding network in CNF.");
+        return encoder;
     }
+
 }

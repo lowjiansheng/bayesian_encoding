@@ -1,11 +1,11 @@
 package bayesian_encoder;
 
 import data_structures.*;
+import helper.Helper;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -113,15 +113,6 @@ public class ClassBayesianEncoder extends BayesianEncoder{
                     String leftImplication = "-" + indicatorVariable + " " + parameterVariableID + CNF_ENDER;
                     encoderWriter.write(leftImplication);
                 }
-                // DEBUG
-                System.out.println("Parameter var = " + parameterVariableID);
-                System.out.println("i = " + i);
-                System.out.println("Boolean array: " );
-                for (int k = 0 ; k < integerBits.length; k++ ){
-                    System.out.print(integerBits[k]);
-                }
-                System.out.println();
-                // DEBUG
                 float val = findWeightValue(integerBits, clique.getFunctionTable());
                 String literal = "w " + parameterVariableID + " " + val + " 0\n";
                 weightsWriter.write(literal);

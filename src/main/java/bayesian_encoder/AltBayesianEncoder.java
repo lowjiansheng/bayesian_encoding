@@ -1,6 +1,8 @@
 package bayesian_encoder;
 
 import data_structures.BayesianClique;
+import helper.Helper;
+import helper.WeightsFileHelper;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -23,8 +25,8 @@ public class AltBayesianEncoder extends BayesianEncoder{
 
             identifySourceNodes(cliques);
 
-            createCNFHeaders(encodingWriter, weightsWriter, numVariables, cliques, evidence);
-            createConstraints(encodingWriter, weightsWriter, numVariables, cliques);
+            createCNFFileHeaders(encodingWriter, weightsWriter, numVariables, cliques, evidence);
+            createCNFsAndWeights(encodingWriter, weightsWriter, numVariables, cliques);
             createHints(encodingWriter, evidence);
 
             encodingWriter.close();
@@ -34,9 +36,8 @@ public class AltBayesianEncoder extends BayesianEncoder{
         }
     }
 
-    private void createConstraints(BufferedWriter encoderWriter, BufferedWriter weightsWriter,
-                                   int numVariables, List<BayesianClique> cliques) throws IOException {
-
+    private void createCNFsAndWeights(BufferedWriter encoderWriter, BufferedWriter weightsWriter,
+                                      int numVariables, List<BayesianClique> cliques) throws IOException {
         // The starting offset for the all the subsequent chance nodes.
         int literalId = numVariables;
 
@@ -47,34 +48,31 @@ public class AltBayesianEncoder extends BayesianEncoder{
             List<Integer> variables = clique.getVariables();
             // Source node. Can just write in the weights for its Chance Nodes.
             if (variables.size() == 1) {
-                String positiveLiteralWeight = "w " + variables.get(0) + " " + clique.getFunctionTable()[0][1] + " 0\n";
-                String negativeLiteralWeight = "w -" + variables.get(0) + " " + clique.getFunctionTable()[0][0] + " 0\n";
-                weightsWriter.write(positiveLiteralWeight);
-                weightsWriter.write(negativeLiteralWeight);
+                WeightsFileHelper.writeWeightsLine(weightsWriter, variables.get(0),
+                        clique.getFunctionTable()[0][1], false);
+                WeightsFileHelper.writeWeightsLine(weightsWriter, variables.get(0),
+                        clique.getFunctionTable()[0][0], true);
                 stateNodeEncoded.add(variables.get(0));
 
             } else {
                 // Creating weights for State Nodes of variables. They should all be of weight 1.
                 for (int var : variables) {
                     if (!sourceNodes.contains(var) && !stateNodeEncoded.contains(var)) {
-                        // TODO: 1,2 encoded twice cos they appeared twice.
-                        String positiveLiteralWeight = "w " + var + " 1 0\n";
-                        String negativeLiteralWeight = "w -" + var + " 1 0\n";
-                        weightsWriter.write(positiveLiteralWeight);
-                        weightsWriter.write(negativeLiteralWeight);
+                        WeightsFileHelper.writeWeightsLine(weightsWriter, var,
+                                1, false);
+                        WeightsFileHelper.writeWeightsLine(weightsWriter, var,
+                                1, true);
                         stateNodeEncoded.add(var);
                     }
                 }
 
-                // Create CLAUSES according to the clique.
-                // Assumption: The last variable in the list is the Bayesian Node.
-                // TODO: Can further optimise for those with values 1.
-                int nodeId = variables.get(variables.size() - 1 );
+                /////// Create CLAUSES according to clique. ///////
+                // This is the State ID of the bayesian variable getting implied.
+                int impliedBayesianNodeStateVarId = variables.get(variables.size() - 1 );
                 double numChanceNodes = Math.pow(2, variables.size() - 1);
                 for (int chanceNodeId = 0 ; chanceNodeId < numChanceNodes; chanceNodeId++ ) {
-                    // All the other nodes
                     boolean[] bits = Helper.getBitsOfInteger(variables.size() - 1, chanceNodeId);
-                    // Left side of implication. All the State Nodes.
+                    // Left side of implication. All the State Nodes that imply the bayesian node.
                     String leftSideImplication = "";
                     for (int j = 0 ; j < bits.length; j++) {
                         if (bits[j]) {
@@ -86,18 +84,17 @@ public class AltBayesianEncoder extends BayesianEncoder{
                     int literalIdOfChanceNode = literalId + chanceNodeId;
                     // Right side of implication. Chance node with State Node of current Bayesian Node.
                     // Will need 2 of this.
-                    String rightSideImplicationOne = "-" + nodeId + " " + literalIdOfChanceNode + " 0\n";
-                    String rightSideImplicationTwo = "-" + literalIdOfChanceNode + " " + nodeId + " 0\n";
+                    String rightSideImplicationOne = "-" + impliedBayesianNodeStateVarId + " " + literalIdOfChanceNode + " 0\n";
+                    String rightSideImplicationTwo = "-" + literalIdOfChanceNode + " " + impliedBayesianNodeStateVarId + " 0\n";
                     encoderWriter.write(leftSideImplication + rightSideImplicationOne);
                     encoderWriter.write(leftSideImplication + rightSideImplicationTwo);
 
                     // Create Weights for Chance Nodes according to clique.
-                    String positiveLiteralWeight = "w " + literalIdOfChanceNode + " " +
-                            clique.getFunctionTable()[chanceNodeId][1] + " 0\n";
-                    String negativeLiteralWeight = "w -" + literalIdOfChanceNode + " " +
-                            clique.getFunctionTable()[chanceNodeId][0] + " 0\n";
-                    weightsWriter.write(positiveLiteralWeight);
-                    weightsWriter.write(negativeLiteralWeight);
+                    WeightsFileHelper.writeWeightsLine(weightsWriter, literalIdOfChanceNode,
+                            clique.getFunctionTable()[chanceNodeId][1], false);
+                    WeightsFileHelper.writeWeightsLine(weightsWriter, literalIdOfChanceNode,
+                            clique.getFunctionTable()[chanceNodeId][0], true);
+
                 }
                 literalId += numChanceNodes;
             }
@@ -105,8 +102,8 @@ public class AltBayesianEncoder extends BayesianEncoder{
     }
 
 
-    private void createCNFHeaders(BufferedWriter encoderWriter, BufferedWriter weightsWriter, int numVariables, List<BayesianClique> cliques,
-                                  Map<Integer, Boolean> evidence) throws IOException {
+    private void createCNFFileHeaders(BufferedWriter encoderWriter, BufferedWriter weightsWriter, int numVariables, List<BayesianClique> cliques,
+                                      Map<Integer, Boolean> evidence) throws IOException {
         // Initialised to number of State Variables
         int totalNumVariables = numVariables;
         int totalNumClauses = 0;
@@ -125,7 +122,6 @@ public class AltBayesianEncoder extends BayesianEncoder{
         encoderWriter.write("p cnf " + totalNumVariables + " " +  totalNumClauses + "\n");
         weightsWriter.write("p " + totalNumVariables + "\n");
     }
-
 
     private void identifySourceNodes(List<BayesianClique> cliques) {
         this.sourceNodes = new HashSet<>();
@@ -148,5 +144,4 @@ public class AltBayesianEncoder extends BayesianEncoder{
             encoderWriter.write(indicatorVariable + " 0\n");
         }
     }
-
 }
